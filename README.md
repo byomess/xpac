@@ -58,18 +58,11 @@ Once installed, you can use `xpac` as a drop-in replacement for your package man
     # Aliases for remove: rm, delete, del
   ```
 
-- **Update package database**:
-
-  ```bash
-  xpac update
-  # Aliases for update: upd, ud
+- **Update package list and upgrade packages**:
+  
   ```
-
-- **Upgrade installed packages**:
-
-  ```bash
-  xpac upgrade
-  # Aliases for upgrade: upg, ug
+  xpac update-upgrade
+  # Aliases for update-upgrade: upd-upg, ud-upg, uu
   ```
 
 - **Purge a package**:

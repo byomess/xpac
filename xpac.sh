@@ -502,7 +502,7 @@ handle_package_action() {
 		;;
 
 	# Update and upgrade in one step
-	update-upgrade | uu)
+	update-upgrade | upd-upg | ud-upg | uu)
 		update_upgrade_packages
 		;;
 
