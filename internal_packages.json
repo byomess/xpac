@@ -1,0 +1,23 @@
+[
+  {
+    "name": "lazymux",
+    "description": "Oh My Zsh"
+  },
+  {
+    "name": "xcb",
+    "description": "A wrapper for xsel, xclip, wl-clipboard, termux-api, and qdbus for copying content to the clipboard.",
+    "url": "https://github.com/byomess/xcb",
+    "version": "1.0.0"
+  },
+  {
+    "name": "omz",
+    "description": "Oh My Zsh",
+    "version": "1.0.0"
+  },
+  {
+    "name": "test",
+    "description": "Test",
+    "version": "1.0.0"
+  }
+]
+
