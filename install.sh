@@ -62,6 +62,10 @@ if [ ! -d "$INTERNAL_PACKAGES_DIR" ]; then
     mkdir -p "$INTERNAL_PACKAGES_DIR"
 fi
 
+# Copy the internal packages to the 'internal_packages' directory
+echo "Copying internal packages to $INTERNAL_PACKAGES_DIR"
+cp -r internal_packages/* "$INTERNAL_PACKAGES_DIR"
+
 # Check if the install path is in the PATH
 if [[ ":$PATH:" != *":$BIN_INSTALL_DIR:"* ]]; then
     echo "$BIN_INSTALL_DIR is not in the PATH"

@@ -2,7 +2,7 @@
 
 # Define constants
 XPAC_VERSION="0.1.0"
-XPAC_HOME="$(dirname "$0")/../lib/xpac"
+XPAC_HOME="$(dirname "$0")/../share/xpac"
 INTERNAL_PACKAGES_FILE="$XPAC_HOME/internal_packages.json"
 INTERNAL_PACKAGES_DIR="$XPAC_HOME/internal_packages"
 INTERNAL_PACKAGES_SETUP_DIR="$XPAC_HOME/internal_packages/setup"
@@ -211,40 +211,40 @@ purge_distro_package() {
 
 # Function to install a package (either internal or distro package)
 install_package() {
-	# Check if internal packages JSON file exists
-	if [ ! -f "$INTERNAL_PACKAGES_FILE" ]; then
-		echo "Error: Internal packages file not found: $INTERNAL_PACKAGES_FILE"
-		return 1
-	fi
+	internal_packages_dir="$HOME/.local/share/xpac/internal_packages"
 
-	# Read the internal packages file once into a variable
-	internal_packages_json=$(cat "$INTERNAL_PACKAGES_FILE")
-
-	# Iterate over each package to install
 	for package_to_install in "$@"; do
-		# Check if the package exists in the internal packages list
-		internal_package_json=$(echo "$internal_packages_json" | jq -r --arg pkg "$package_to_install" '.[] | select(.name == $pkg)')
+		internal_package_path=""
 
-		if [ -n "$internal_package_json" ]; then
-			# If the package is an internal package, install it using internal script
-			install_internal_package "$package_to_install"
+		if [ -f "$internal_packages_dir/setup/$package_to_install.sh" ]; then
+			internal_package_path="$internal_packages_dir/setup/$package_to_install.sh"
+		elif [ -f "$internal_packages_dir/teardown/$package_to_install.sh" ]; then
+			internal_package_path="$internal_packages_dir/teardown/$package_to_install.sh"
+		fi
+
+		if [ -n "$internal_package_path" ]; then
+			install_internal_package "$internal_package_path"
 		else
-			# Otherwise, install it using the distro package manager
 			install_distro_package "$package_to_install"
 		fi
 	done
 }
 
+# Function to uninstall a package (either internal or distro package)
 uninstall_package() {
-	internal_packages_json=$(cat "$INTERNAL_PACKAGES_FILE" | jq -r '.[]')
+	internal_packages_dir="$HOME/.local/share/xpac/internal_packages"
 
-	packages_to_uninstall="$@"
+	for package_to_uninstall in "$@"; do
+		internal_package_path=""
 
-	for package_to_uninstall in $packages_to_uninstall; do
-		internal_package_json=$(echo "$internal_packages_json" | jq -r '. | select(.name == "'$package_to_uninstall'")')
+		if [ -f "$internal_packages_dir/setup/$package_to_uninstall.sh" ]; then
+			internal_package_path="$internal_packages_dir/setup/$package_to_uninstall.sh"
+		elif [ -f "$internal_packages_dir/teardown/$package_to_uninstall.sh" ]; then
+			internal_package_path="$internal_packages_dir/teardown/$package_to_uninstall.sh"
+		fi
 
-		if [ -n "$internal_package_json" ]; then
-			uninstall_internal_package "$package_to_uninstall"
+		if [ -n "$internal_package_path" ]; then
+			uninstall_internal_package "$internal_package_path"
 		else
 			uninstall_distro_package "$package_to_uninstall"
 		fi
