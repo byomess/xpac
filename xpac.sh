@@ -251,16 +251,21 @@ uninstall_package() {
 	done
 }
 
+# Function to purge a package (either internal or distro package)
 purge_package() {
-	internal_packages_json=$(cat "$INTERNAL_PACKAGES_FILE" | jq -r '.[]')
+	internal_packages_dir="$HOME/.local/share/xpac/internal_packages"
 
-	packages_to_purge="$@"
+	for package_to_purge in "$@"; do
+		internal_package_path=""
 
-	for package_to_purge in $packages_to_purge; do
-		internal_package_json=$(echo "$internal_packages_json" | jq -r '. | select(.name == "'$package_to_purge'")')
+		if [ -f "$internal_packages_dir/setup/$package_to_purge.sh" ]; then
+			internal_package_path="$internal_packages_dir/setup/$package_to_purge.sh"
+		elif [ -f "$internal_packages_dir/teardown/$package_to_purge.sh" ]; then
+			internal_package_path="$internal_packages_dir/teardown/$package_to_purge.sh"
+		fi
 
-		if [ -n "$internal_package_json" ]; then
-			purge_internal_package "$package_to_purge"
+		if [ -n "$internal_package_path" ]; then
+			purge_internal_package "$internal_package_path"
 		else
 			purge_distro_package "$package_to_purge"
 		fi
