@@ -453,9 +453,11 @@ handle_package_action() {
 
 	# Check for valid action and packages argument
 	if [[ -z "$action" ]]; then
-		echo "Error: No action specified."
-		display_usage
-		return 1
+		# echo "Error: No action specified."
+		# display_usage
+		# return 1
+
+		action="update-upgrade"
 	fi
 
 	case "$action" in
