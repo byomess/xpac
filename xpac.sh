@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
 # --- Constants ---
-readonly XPAC_VERSION="0.1.4" # Incremented version
-readonly XPAC_HOME="$(dirname "$0")/../share/xpac"                  # Path to xpac's shared directory.
-readonly INTERNAL_PACKAGES_FILE="$XPAC_HOME/internal_packages.json" # Path to the JSON file listing internal packages.
-readonly INTERNAL_PACKAGES_DIR="$XPAC_HOME/internal_packages"       # Directory for internal packages.
-readonly INTERNAL_PACKAGES_SETUP_DIR="$INTERNAL_PACKAGES_DIR/setup"   # Directory for internal package setup scripts.
-readonly INTERNAL_PACKAGES_TEARDOWN_DIR="$INTERNAL_PACKAGES_DIR/teardown" # Directory for internal package teardown scripts.
+readonly XPAC_VERSION="0.2.0"
+readonly XPAC_HOME="$(dirname "$0")/../share/xpac"                  		# Path to xpac's shared directory.
+readonly INTERNAL_PACKAGES_FILE="$XPAC_HOME/internal_packages.json" 		# Path to the JSON file listing internal packages.
+readonly INTERNAL_PACKAGES_DIR="$XPAC_HOME/internal_packages"       		# Directory for internal packages.
+readonly INTERNAL_PACKAGES_SETUP_DIR="$INTERNAL_PACKAGES_DIR/setup"   		# Directory for internal package setup scripts.
+readonly INTERNAL_PACKAGES_TEARDOWN_DIR="$INTERNAL_PACKAGES_DIR/teardown" 	# Directory for internal package teardown scripts.
 
 # --- Globals ---
 declare package_manager="" # Detected package manager (e.g., apt, pacman).
@@ -14,17 +14,16 @@ declare distro_name=""     # Detected Linux distribution name.
 declare -A dep_map         # Associative array for dependency package names
 
 # --- Dependency Package Name Mappings ---
-# (Keep this section as is)
 # Format: dep_map[command,package_manager]=package_name
 dep_map[ping,apt]="iputils-ping"
-dep_map[ping,pacman]="inetutils" # On Arch, ping and hostname are in inetutils
+dep_map[ping,pacman]="inetutils"
 dep_map[ping,dnf]="iputils"
 dep_map[ping,yum]="iputils"
 dep_map[ping,zypper]="iputils"
 dep_map[ping,pkg]="inetutils"
 
-dep_map[hostname,apt]="hostname" # Debian/Ubuntu often have a dedicated 'hostname' package
-dep_map[hostname,pacman]="inetutils" # Arch
+dep_map[hostname,apt]="hostname"
+dep_map[hostname,pacman]="inetutils"
 dep_map[hostname,dnf]="hostname"
 dep_map[hostname,yum]="hostname"
 dep_map[hostname,zypper]="hostname"
@@ -87,14 +86,14 @@ dep_map[uname,zypper]="coreutils"
 dep_map[uname,pkg]="coreutils"
 
 dep_map[rpm,apt]="rpm"
-dep_map[rpm,pacman]="rpm-tools" # Or similar, may need separate check
+dep_map[rpm,pacman]="rpm-tools"
 dep_map[rpm,dnf]="rpm"
 dep_map[rpm,yum]="rpm"
 dep_map[rpm,zypper]="rpm"
-dep_map[rpm,pkg]="" # pkg does not use rpm
+dep_map[rpm,pkg]=""
 
 dep_map[dpkg,apt]="dpkg"
-dep_map[dpkg,pacman]="" # pacman does not use dpkg
+dep_map[dpkg,pacman]=""
 dep_map[dpkg,dnf]=""
 dep_map[dpkg,yum]=""
 dep_map[dpkg,zypper]=""
@@ -120,10 +119,8 @@ _info() {
 # Outputs: Command prefixed with sudo if necessary.
 _maybe_sudo() {
     if [[ "$EUID" -eq 0 || "$package_manager" == "yay" ]]; then
-        # If root or using yay (which handles its own sudo), just output the command
         echo "$@"
     else
-        # Otherwise, prepend sudo
         echo "sudo" "$@"
     fi
 }
@@ -156,7 +153,6 @@ _require_command() {
 
         if [[ "$answer" =~ ^[Yy]$|^$ ]]; then
             _info "Attempting to install '$package_name'..."
-            # Use install_package which now handles sudo correctly via _run_native_command
             if install_distro_package "$package_name"; then
                 if command -v "$cmd" &>/dev/null; then
                     _info "'$package_name' installed successfully."
@@ -179,7 +175,7 @@ _require_command() {
             uname|df|ps|free|uptime|ls|grep|awk|sed|head|tail|cat|echo|printf)
                  _err "Critical command '$cmd' not found. This indicates a broken base system or PATH issue."
                  return 1;;
-            hostname|rpm|dpkg) # Added rpm/dpkg as potentially missing but mapped
+            hostname|rpm|dpkg)
                  _err "Command '$cmd' not found, and no package mapping defined for '$package_manager' or 'pacman' fallback."
                  _info "Please try installing the appropriate package manually (e.g., '$cmd', 'rpm-tools', 'inetutils', 'dpkg')."
                  return 1;;
@@ -192,7 +188,6 @@ _require_command() {
 }
 
 # Description: Displays usage information and exits.
-# (Keep this function as is)
 display_usage() {
   cat <<EOF
 Usage: xpac [command] [args...]
@@ -245,12 +240,11 @@ Examples:
 
 For more information, see: https://github.com/byomess/xpac
 EOF
-  exit 0 # Exit normally for help
+  exit 0
 }
 
 
 # Description: Determines the system's package manager.
-# (Keep this function as is)
 get_package_manager() {
   local manager
   local managers=("yay" "pacman" "pkg" "apt" "dnf" "yum" "zypper")
@@ -265,19 +259,17 @@ get_package_manager() {
 }
 
 # Description: Gets the name of the Linux distribution from /etc/os-release.
-# (Keep this function as is)
 get_distro_name() {
   if [ -f /etc/os-release ]; then
     # shellcheck disable=SC1091
     . /etc/os-release
-    echo "${PRETTY_NAME:-$NAME}" # Prefer pretty name
+    echo "${PRETTY_NAME:-$NAME}"
   else
     echo "unknown"
   fi
 }
 
 # --- Internal Package Management ---
-# (Keep these functions as is)
 
 # Description: Executes an internal package script (setup or teardown).
 run_internal_package_script() {
@@ -304,11 +296,10 @@ uninstall_internal_package() {
 _run_native_command() {
     local xpac_action="$1"; shift
     local args=("$@")
-    local native_cmd_parts=() # Array to build the command
-    local needs_sudo=1        # Default to needing sudo
-    local suppress_exit_code=0 # Flag for commands like check-update
+    local native_cmd_parts=()
+    local needs_sudo=1
+    local suppress_exit_code=0
 
-    # Actions that generally DON'T need sudo
     case "$xpac_action" in
         search|list|list-installed|list-files|show|search-installed)
             needs_sudo=0 ;;
@@ -316,32 +307,30 @@ _run_native_command() {
 
     case "$package_manager" in
         pacman)
-            # needs_sudo default is 1, overridden by case above if needed
             case "$xpac_action" in
-                install)        native_cmd_parts=(pacman -S --needed --noconfirm "${args[@]}") ;;
-                remove)         native_cmd_parts=(pacman -R --noconfirm "${args[@]}") ;;
-                purge)          native_cmd_parts=(pacman -Rns --noconfirm "${args[@]}") ;;
+                install)        native_cmd_parts=(pacman -S --needed --noconfirm "${args[@]}"); needs_sudo=1 ;;
+                remove)         native_cmd_parts=(pacman -R --noconfirm "${args[@]}"); needs_sudo=1 ;;
+                purge)          native_cmd_parts=(pacman -Rns --noconfirm "${args[@]}"); needs_sudo=1 ;;
                 search)         native_cmd_parts=(pacman -Ss "${args[@]}") ;;
-                search-installed) native_cmd_parts=(pacman -Qs "${args[@]}") ;; # <-- ADDED
-                update)         native_cmd_parts=(pacman -Sy); needs_sudo=1 ;; # Update needs sudo
-                upgrade)        native_cmd_parts=(pacman -Syu --noconfirm); needs_sudo=1 ;; # Upgrade needs sudo
+                search-installed) native_cmd_parts=(pacman -Qs "${args[@]}") ;;
+                update)         native_cmd_parts=(pacman -Sy); needs_sudo=1 ;;
+                upgrade)        native_cmd_parts=(pacman -Syu --noconfirm); needs_sudo=1 ;;
                 list)           native_cmd_parts=(pacman -Sl) ;;
                 list-installed) native_cmd_parts=(pacman -Qe) ;;
                 list-files)     native_cmd_parts=(pacman -Ql "${args[@]}") ;;
                 show)           native_cmd_parts=(pacman -Si "${args[@]}") ;;
-                clean-cache)    native_cmd_parts=(pacman -Sc --noconfirm); needs_sudo=1 ;; # Clean needs sudo
-                # autoremove kept separate
+                clean-cache)    native_cmd_parts=(pacman -Sc --noconfirm); needs_sudo=1 ;;
                 *) _err "Xpac action '$xpac_action' not implemented for pacman."; return 1 ;;
             esac
             ;;
         yay)
-            needs_sudo=0 # yay handles its own sudo internally
+            needs_sudo=0
             case "$xpac_action" in
                 install)        native_cmd_parts=(yay -S --needed --noconfirm "${args[@]}") ;;
                 remove)         native_cmd_parts=(yay -R --noconfirm "${args[@]}") ;;
                 purge)          native_cmd_parts=(yay -Rns --noconfirm "${args[@]}") ;;
                 search)         native_cmd_parts=(yay -Ss "${args[@]}") ;;
-                search-installed) native_cmd_parts=(pacman -Qs "${args[@]}") ;; # <-- ADDED (uses pacman)
+                search-installed) native_cmd_parts=(pacman -Qs "${args[@]}") ;;
                 update)         native_cmd_parts=(yay -Sy) ;;
                 upgrade)        native_cmd_parts=(yay -Syu --noconfirm) ;;
                 list)           native_cmd_parts=(yay -Sl) ;;
@@ -354,13 +343,11 @@ _run_native_command() {
             esac
             ;;
         apt)
-            # needs_sudo default is 1, overridden by case above if needed
             case "$xpac_action" in
-                install)        native_cmd_parts=(apt-get install -y "${args[@]}") ;;
-                remove)         native_cmd_parts=(apt-get remove -y "${args[@]}") ;;
-                purge)          native_cmd_parts=(apt-get purge -y "${args[@]}") ;;
+                install)        native_cmd_parts=(apt-get install -y "${args[@]}"); needs_sudo=1 ;;
+                remove)         native_cmd_parts=(apt-get remove -y "${args[@]}"); needs_sudo=1 ;;
+                purge)          native_cmd_parts=(apt-get purge -y "${args[@]}"); needs_sudo=1 ;;
                 search)         native_cmd_parts=(apt-cache search --names-only "${args[@]}") ;;
-                # search-installed handled by wrapper
                 update)         native_cmd_parts=(apt-get update); needs_sudo=1 ;;
                 upgrade)        native_cmd_parts=(apt-get upgrade -y); needs_sudo=1 ;;
                 list)           native_cmd_parts=(apt-cache pkgnames) ;;
@@ -373,15 +360,14 @@ _run_native_command() {
             esac
             ;;
         dnf | yum)
-            # needs_sudo default is 1, overridden by case above if needed
             local mgr_cmd="$package_manager"
             case "$xpac_action" in
-                install)        native_cmd_parts=("$mgr_cmd" install -y "${args[@]}") ;;
-                remove)         native_cmd_parts=("$mgr_cmd" remove -y "${args[@]}") ;;
-                purge)          _info "'purge' not distinct for $mgr_cmd; using remove."; native_cmd_parts=("$mgr_cmd" remove -y "${args[@]}") ;;
+                install)        native_cmd_parts=("$mgr_cmd" install -y "${args[@]}"); needs_sudo=1 ;;
+                remove)         native_cmd_parts=("$mgr_cmd" remove -y "${args[@]}"); needs_sudo=1 ;;
+                purge)          _info "'purge' not distinct for $mgr_cmd; using remove."; native_cmd_parts=("$mgr_cmd" remove -y "${args[@]}"); needs_sudo=1 ;;
                 search)         native_cmd_parts=("$mgr_cmd" search "${args[@]}") ;;
-                search-installed) native_cmd_parts=("$mgr_cmd" list installed "${args[@]}") ;; # <-- ADDED
-                update)         native_cmd_parts=("$mgr_cmd" check-update); suppress_exit_code=1 ;; # check-update needs sudo despite case above
+                search-installed) native_cmd_parts=("$mgr_cmd" list installed "${args[@]}") ;;
+                update)         native_cmd_parts=("$mgr_cmd" check-update); suppress_exit_code=1; needs_sudo=1 ;;
                 upgrade)        native_cmd_parts=("$mgr_cmd" upgrade -y); needs_sudo=1 ;;
                 list)           native_cmd_parts=("$mgr_cmd" list available) ;;
                 list-installed) native_cmd_parts=("$mgr_cmd" list installed) ;;
@@ -393,13 +379,12 @@ _run_native_command() {
             esac
             ;;
         zypper)
-            # needs_sudo default is 1, overridden by case above if needed
             case "$xpac_action" in
-                install)        native_cmd_parts=(zypper --non-interactive install "${args[@]}") ;;
-                remove)         native_cmd_parts=(zypper --non-interactive remove "${args[@]}") ;;
-                purge)          _info "'purge' not distinct for zypper; using remove."; native_cmd_parts=(zypper --non-interactive remove "${args[@]}") ;;
+                install)        native_cmd_parts=(zypper --non-interactive install "${args[@]}"); needs_sudo=1 ;;
+                remove)         native_cmd_parts=(zypper --non-interactive remove "${args[@]}"); needs_sudo=1 ;;
+                purge)          _info "'purge' not distinct for zypper; using remove."; native_cmd_parts=(zypper --non-interactive remove "${args[@]}"); needs_sudo=1 ;;
                 search)         native_cmd_parts=(zypper search "${args[@]}") ;;
-                search-installed) native_cmd_parts=(zypper search --installed-only "${args[@]}") ;; # <-- ADDED
+                search-installed) native_cmd_parts=(zypper search --installed-only "${args[@]}") ;;
                 update)         native_cmd_parts=(zypper refresh); needs_sudo=1 ;;
                 upgrade)        native_cmd_parts=(zypper --non-interactive update); needs_sudo=1 ;;
                 list)           native_cmd_parts=(zypper search --type package) ;;
@@ -412,13 +397,11 @@ _run_native_command() {
             esac
             ;;
         pkg)
-            # needs_sudo default is 1, overridden by case above if needed
             case "$xpac_action" in
-                install)        native_cmd_parts=(pkg install -y "${args[@]}") ;;
-                remove)         native_cmd_parts=(pkg remove -y "${args[@]}") ;;
-                purge)          _info "'purge' not distinct for pkg; using remove."; native_cmd_parts=(pkg remove -y "${args[@]}") ;;
+                install)        native_cmd_parts=(pkg install -y "${args[@]}"); needs_sudo=1 ;;
+                remove)         native_cmd_parts=(pkg remove -y "${args[@]}"); needs_sudo=1 ;;
+                purge)          _info "'purge' not distinct for pkg; using remove."; native_cmd_parts=(pkg remove -y "${args[@]}"); needs_sudo=1 ;;
                 search)         native_cmd_parts=(pkg search "${args[@]}") ;;
-                # search-installed handled by wrapper
                 update)         native_cmd_parts=(pkg update); needs_sudo=1 ;;
                 upgrade)        native_cmd_parts=(pkg upgrade -y); needs_sudo=1 ;;
                 list)           native_cmd_parts=(pkg rquery "%n-%v") ;;
@@ -436,30 +419,21 @@ _run_native_command() {
             ;;
     esac
 
-    # Ensure a command was actually mapped
     if [ ${#native_cmd_parts[@]} -eq 0 ]; then
-         # This check might be redundant now if all actions have a '*' case, but keep for safety
         _err "Internal Error: Action '$xpac_action' failed to map to a native command for '$package_manager'."
         return 1
     fi
 
-    # Prepare the final command with potential sudo
     local final_cmd_str
-    # Use the needs_sudo flag determined within the case statement
     if [[ "$needs_sudo" -eq 1 ]]; then
          final_cmd_str=$(_maybe_sudo "${native_cmd_parts[@]}")
     else
-         # If no sudo needed, directly join parts (handle potential spaces/quotes)
-         # Using printf/read is safer than simple echo for joining array elements
          printf -v final_cmd_str "%q " "${native_cmd_parts[@]}"
     fi
 
-
-    # Execute the command
     eval "$final_cmd_str"
     local exit_status=$?
 
-    # Handle specific exit codes if needed
     if [[ "$suppress_exit_code" -eq 1 && "$exit_status" -ne 0 ]]; then
          _info "(Ignoring non-zero exit status $exit_status for $xpac_action)"
         return 0
@@ -485,7 +459,6 @@ uninstall_distro_package() {
 # Description: Purges distribution packages (removes config files).
 purge_distro_package() {
    if [ $# -eq 0 ]; then _err "No packages specified for purge."; return 1; fi
-   # Purge fallback info message is now handled inside _run_native_command
    _run_native_command "purge" "$@"
 }
 
@@ -555,13 +528,11 @@ list_package_files() {
 }
 
 # Description: Lists commands (binaries) provided by a package.
-# Relies on list_package_files, so keep logic here
 list_package_commands() {
   local package="$1"
   if [ -z "$package" ]; then _err "No package specified for listing commands."; return 1; fi
 
   local list_files_output
-  # Use the wrapper function which now calls the dispatcher
   list_files_output=$(list_package_files "$package" 2>/dev/null)
   local exit_status=$?
 
@@ -582,24 +553,21 @@ clean_cache() {
 }
 
 # Description: Removes unused dependencies (orphaned packages).
-# Specific logic needed, especially for pacman
 autoremove() {
    _info "Removing unused dependencies using $package_manager..."
   case "$package_manager" in
     pacman)
                   local orphans
-                  orphans=$(pacman -Qdtq) # No sudo needed for query
+                  orphans=$(pacman -Qdtq)
                   if [[ -n "$orphans" ]]; then
-                    # Use _maybe_sudo correctly
                     local cmd_str
                     cmd_str=$(_maybe_sudo pacman -Rs --noconfirm -)
-                    echo "$orphans" | eval "$cmd_str" # Pipe orphans to the command
+                    echo "$orphans" | eval "$cmd_str"
                     return $?
                   else
                     _info "No orphaned packages to remove."
                     return 0
                   fi ;;
-    # Other managers can use the dispatcher
     *) _run_native_command "autoremove" ;;
   esac
 }
@@ -608,7 +576,6 @@ autoremove() {
 
 # Description: Shows basic system information.
 util_sysinfo() {
-    # --- Upfront dependency checks ---
     local hostname_cmd="<hostname command missing>"
     local kernel_info="<uname command missing>"
     local arch_info="<uname command missing>"
@@ -621,14 +588,13 @@ util_sysinfo() {
         arch_info="$(uname -m)"
     fi
     if _require_command uptime "uptime utility (procps/procps-ng)"; then
-         uptime_info="$(uptime -p 2>/dev/null || uptime)" # Fallback
+         uptime_info="$(uptime -p 2>/dev/null || uptime)"
     fi
     if _require_command lscpu "lscpu utility (util-linux)"; then
         local cores
         cores=$(lscpu | grep '^CPU(s):' | awk '{print $2}')
         cores_info="${cores:-<not detected>}"
     fi
-    # --- End checks ---
 
     echo "--- System Information ---"
     printf "Hostname:\t%s\n" "$hostname_cmd"
@@ -644,7 +610,6 @@ util_sysinfo() {
 # Description: Shows disk usage for major filesystems.
 util_disk() {
     if ! _require_command df "df utility (coreutils)"; then return 1; fi
-    # (Rest of function remains the same)
     echo "--- Disk Usage (excluding tmpfs/devtmpfs/squashfs) ---"
     if df --total -hT --exclude-type=tmpfs --exclude-type=devtmpfs --exclude-type=squashfs &>/dev/null; then
         df --total -hT --exclude-type=tmpfs --exclude-type=devtmpfs --exclude-type=squashfs
@@ -658,7 +623,6 @@ util_disk() {
 # Description: Shows memory usage.
 util_memory() {
      if ! _require_command free "free utility (procps/procps-ng)"; then return 1; fi
-     # (Rest of function remains the same)
      echo "--- Memory Usage ---"
      free -h
      echo "--------------------"
@@ -667,7 +631,6 @@ util_memory() {
 
 # Description: Shows CPU information.
 util_cpuinfo() {
-    # --- Upfront dependency checks ---
     local cpu_model="<lscpu command missing>"
     local load_avg="<uptime command missing>"
     local lscpu_extra_info=""
@@ -676,8 +639,6 @@ util_cpuinfo() {
     local uptime_ok=0
     _require_command lscpu "lscpu utility (util-linux)" && lscpu_ok=1
     _require_command uptime "uptime utility (procps/procps-ng)" && uptime_ok=1
-    # --- End checks ---
-
 
     if [[ $lscpu_ok -eq 1 ]]; then
         cpu_model=$(lscpu | grep 'Model name:' | sed -E 's/Model name:\s*//')
@@ -699,7 +660,6 @@ util_cpuinfo() {
 
 # Description: Shows IP addresses for active interfaces.
 util_ip() {
-    # --- Upfront dependency checks (conditional) ---
     local ip_found=0
     local ifconfig_found=0
     if command -v ip &>/dev/null; then ip_found=1; fi
@@ -707,22 +667,18 @@ util_ip() {
 
     if [[ $ip_found -eq 0 && $ifconfig_found -eq 0 ]]; then
          _err "Neither 'ip' (iproute2) nor 'ifconfig' (net-tools) command found."
-         # Try to install iproute2
          if ! _require_command ip "ip utility (iproute2)"; then return 1; fi
-         ip_found=1 # Assume install succeeded if _require_command returns 0
+         ip_found=1
     fi
-    # --- End checks ---
 
     echo "--- Network Interfaces (IP Addresses) ---"
     if [[ $ip_found -eq 1 ]]; then
-        # Ensure ip is definitely available now (covers case where it was just installed)
         if ! command -v ip &>/dev/null; then _err "ip command still not found after install attempt."; return 1; fi
         ip -br address show scope global | awk '$1 != "lo" { $1=$1":"; print $1 "\t" $3}'
         if ! ip -br address show scope global | grep -q -v '^lo '; then
              _info "No active global IP addresses found (excluding loopback)."
         fi
     elif [[ $ifconfig_found -eq 1 ]]; then
-         # Ensure ifconfig exists (less likely to need install)
          if ! _require_command ifconfig "ifconfig utility (net-tools)"; then return 1; fi
          _info "Using 'ifconfig' (less preferred)."
          ifconfig | grep -E '^\w.*Link|inet ' | grep -v '127.0.0.1|::1' | sed -n -e '/^\w/h' -e '/inet / { G; s/ *inet \([0-9.]*\).*/\1/p; }'
@@ -733,18 +689,15 @@ util_ip() {
 
 
 # Description: Shows top processes by CPU or Memory with cleaner output and options.
-# (Keep this function as is - already checks ps upfront)
 util_top() {
     if ! _require_command ps "ps utility (procps/procps-ng)"; then return 1; fi
 
-    # --- Default values ---
     local num_lines=10
     local filter_pattern=""
-    local sort_key_user="cpu" # User-friendly key
-    local sort_key_ps="-%cpu" # ps sort specifier
+    local sort_key_user="cpu"
+    local sort_key_ps="-%cpu"
     local header_text="--- Top Processes by CPU Usage ---"
 
-    # --- Argument Parsing (Improved) ---
     while [[ $# -gt 0 ]]; do
         [[ "$1" =~ ^- ]] || break
         case "$1" in
@@ -757,7 +710,7 @@ util_top() {
                     pid) sort_key_ps="pid"; header_text="--- Processes Sorted by PID ---" ;;
                     user) sort_key_ps="user"; header_text="--- Processes Sorted by User ---" ;;
                     start|start_time) sort_key_ps="start_time"; header_text="--- Processes Sorted by Start Time ---" ;;
-                    time) sort_key_ps="-time"; header_text="--- Processes Sorted by CPU Time ---" ;; # Often cumulative time
+                    time) sort_key_ps="-time"; header_text="--- Processes Sorted by CPU Time ---" ;;
                     *) _err "Invalid sort key '$2'. Use: cpu, mem, pid, user, start_time, time."; return 1 ;;
                 esac
                 shift 2 ;;
@@ -782,7 +735,6 @@ util_top() {
         return 1
     fi
 
-    # --- Header Adjustment ---
     if [ -n "$filter_pattern" ]; then header_text+=" (Filtered by '$filter_pattern')"; fi
     if [ "$num_lines" -ne 10 ]; then
          header_text="${header_text/Top Processes/Top $num_lines Processes}"
@@ -790,23 +742,39 @@ util_top() {
     fi
     echo "$header_text"
 
-    # --- Define Column Widths & Print Header ---
     local w_user=10 w_pid=7 w_cpu=5 w_mem=5 w_vsz=9 w_rss=8 w_stat=5 w_start=5 w_time=8 w_cmd=60
     printf "%-${w_user}s %${w_pid}s %${w_cpu}s %${w_mem}s %${w_vsz}s %${w_rss}s %-${w_stat}s %${w_start}s %${w_time}s %s\n" \
         "USER" "PID" "%CPU" "%MEM" "VSZ(KiB)" "RSS(KiB)" "STAT" "START" "TIME" "COMMAND"
 
-    # --- Build Pipeline & AWK Script ---
     local ps_output
-    local awk_script='...' # (Keep the awk script as is from previous version)
+    # Correct AWK script definition
+    local awk_script='
+    BEGIN {
+        printed_lines = 0
+    }
+    {
+        command_col = ""
+        for (i = 10; i <= NF; i++) {
+            command_col = command_col $i " "
+        }
+        sub(/ $/, "", command_col)
 
-    # --- Execute Pipeline & Format Output ---
+        if (length(command_col) > cmdw) {
+            command_col = substr(command_col, 1, cmdw - 3) "..."
+        }
+        printf "%-*s %*s %*s %*s %*s %*s %-*s %*s %*s %s\n", u, $1, p, $2, c, $3, m, $4, v, $5, r, $6, st, $7, sd, $8, t, $9, command_col
+        printed_lines++
+    }
+    END {
+        exit (printed_lines == 0)
+    }'
+
     ps_output=$(ps axo user:$((${w_user}+1)),pid,%cpu,%mem,vsz,rss,stat,start_time,time,args --sort="$sort_key_ps" | tail -n +2)
     if [ -n "$filter_pattern" ]; then ps_output=$(echo "$ps_output" | grep -i -- "$filter_pattern"); fi
     formatted_output=$(echo "$ps_output" | head -n "$num_lines" | awk -v u=$w_user -v p=$w_pid -v c=$w_cpu -v m=$w_mem -v v=$w_vsz -v r=$w_rss -v st=$w_stat -v sd=$w_start -v t=$w_time -v cmdw=$w_cmd "$awk_script")
     local awk_exit_status=$?
     echo "$formatted_output"
 
-    # --- Handle No Results & Print Footer ---
     if [ $awk_exit_status -ne 0 ] && [ -n "$filter_pattern" ] ; then _info "No processes found matching filter '$filter_pattern'."; elif [ $awk_exit_status -ne 0 ]; then _info "No processes found or error during formatting."; fi
     local total_width=$(( w_user + 1 + w_pid + 1 + w_cpu + 1 + w_mem + 1 + w_vsz + 1 + w_rss + 1 + w_stat + 1 + w_start + 1 + w_time + 1 + w_cmd ))
     printf '%.0s-' $(seq 1 $total_width); printf '\n'
@@ -816,7 +784,6 @@ util_top() {
 
 
 # Description: Pings a host to check network connectivity.
-# (Keep this function as is - already checks ping upfront)
 util_ping() {
     if ! _require_command ping "ping utility (iputils/inetutils)"; then return 1; fi
     local target_host="8.8.8.8"; local ping_count=4
@@ -832,7 +799,6 @@ util_ping() {
 # --- Main Logic ---
 
 # Description: Checks if a package name corresponds to an internal package.
-# (Keep this function as is)
 is_internal_package() {
   local package_name="$1"
   [ -f "$INTERNAL_PACKAGES_SETUP_DIR/$package_name.sh" ] || \
@@ -840,10 +806,9 @@ is_internal_package() {
 }
 
 # Description: Installs packages, dispatching to internal or distro handler.
-# (Keep this function as is)
 install_package() {
   local pkg; local overall_status=0
-  if [ $# -eq 0 ]; then _err "No packages specified for install."; return 1; fi
+  if [ $# -eq 0 ]; then _err "No packages specified for install."; return 1; fi # FIX: Added return 1
   local distro_pkgs=()
   for pkg in "$@"; do
     if is_internal_package "$pkg"; then install_internal_package "$pkg" || overall_status=$?; else distro_pkgs+=("$pkg"); fi
@@ -853,10 +818,9 @@ install_package() {
 }
 
 # Description: Uninstalls packages, dispatching to internal or distro handler.
-# (Keep this function as is)
 uninstall_package() {
   local pkg; local overall_status=0
-   if [ $# -eq 0 ]; then _err "No packages specified for remove."; return 1; fi
+   if [ $# -eq 0 ]; then _err "No packages specified for remove."; return 1; fi # FIX: Added return 1
   local distro_pkgs=()
   for pkg in "$@"; do
     if is_internal_package "$pkg"; then
@@ -868,10 +832,9 @@ uninstall_package() {
 }
 
 # Description: Purges packages; equivalent to uninstall for internal packages.
-# (Keep this function as is)
 purge_package() {
   local pkg; local overall_status=0
-  if [ $# -eq 0 ]; then _err "No packages specified for purge."; return 1; fi
+  if [ $# -eq 0 ]; then _err "No packages specified for purge."; return 1; fi # FIX: Added return 1
   local distro_pkgs=()
   for pkg in "$@"; do
     if is_internal_package "$pkg"; then
@@ -884,18 +847,25 @@ purge_package() {
 }
 
 # Description: Fallback for unrecognized commands (attempts yay search/install).
-# (Keep this function as is)
 selective_install_package() {
   local potential_package="$1"
   if [ -z "$potential_package" ]; then display_usage; return 1; fi
   case "$package_manager" in
-    yay) _info "Unrecognized command '$potential_package'. Attempting interactive search/install with yay."; yay "$@"; return $? ;;
-    *) _err "Unknown action or package '$potential_package'."; display_usage; return 1 ;;
+    yay)
+      _info "Unrecognized command '$potential_package'. Attempting interactive search/install with yay."
+      yay "$@"
+      # FIX: Return 127 (command not found) even if yay succeeds
+      _err "Command '$potential_package' is not a valid xpac command."
+      return 127
+      ;;
+    *)
+      _err "Unknown action or package '$potential_package'."
+      display_usage
+      return 1 ;;
   esac
 }
 
 # Description: Handles the main action based on user input command.
-# (Keep this function as is - no changes needed here for this refactor)
 handle_main_action() {
   local action="${1:-update-upgrade}"; shift || true; local args=("$@")
   if [[ "$action" == "--help" || "$action" == "-h" ]]; then display_usage; return 0; fi
@@ -906,7 +876,7 @@ handle_main_action() {
     remove | rm | del)        uninstall_package "${args[@]}" ;;
     purge | pu | p)           purge_package "${args[@]}" ;;
     search | s | find | f)    search_packages "${args[@]}" ;;
-    search-installed | si)    search_installed_packages "${args[@]}" ;; # Keep call here
+    search-installed | si)    search_installed_packages "${args[@]}" ;;
     update | ud)              update_package_list ;;
     upgrade | ug)             upgrade_packages ;;
     update-upgrade | uu)      update_upgrade_packages ;;
@@ -916,7 +886,7 @@ handle_main_action() {
     list-commands | lc)       list_package_commands "${args[0]}" ;;
     show | sh | info | inf)   show_package_info "${args[0]}" ;;
     clean-cache | cc)         clean_cache ;;
-    autoremove | ar)          autoremove ;; # Keep call here
+    autoremove | ar)          autoremove ;;
     sysinfo)                  util_sysinfo ;;
     disk | df)                util_disk ;;
     memory | mem)             util_memory ;;
@@ -933,7 +903,6 @@ handle_main_action() {
 
 # --- Script Execution ---
 
-# (Keep this section as is)
 package_manager=$(get_package_manager)
 if [ "$package_manager" = "unknown" ]; then
   _err "Could not detect a supported package manager (apt, pacman, yay, dnf, yum, zypper, pkg)."
